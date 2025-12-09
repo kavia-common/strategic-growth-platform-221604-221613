@@ -3,6 +3,7 @@ const healthController = require('../controllers/health');
 const authMiddleware = require('../middleware/auth');
 const chatRoutes = require('./chat');
 const dashboardRoutes = require('./dashboard');
+const webhookRoutes = require('./webhooks');
 
 const router = express.Router();
 // Health endpoint
@@ -34,6 +35,9 @@ const router = express.Router();
  *                   example: development
  */
 router.get('/', healthController.check.bind(healthController));
+
+// Mount webhook routes (no auth required for Supabase webhooks)
+router.use('/webhooks', webhookRoutes);
 
 // Mount protected API routes
 router.use('/api/chat', authMiddleware, chatRoutes);

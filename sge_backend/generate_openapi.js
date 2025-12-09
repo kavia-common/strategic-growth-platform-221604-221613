@@ -13,3 +13,5 @@ fs.writeFileSync(
   outputPath,
   JSON.stringify(swaggerSpec, null, 2)
 );
+
+console.log(`OpenAPI spec generated at ${outputPath}`);
