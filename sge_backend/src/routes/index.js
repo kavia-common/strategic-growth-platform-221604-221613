@@ -1,5 +1,8 @@
 const express = require('express');
 const healthController = require('../controllers/health');
+const authMiddleware = require('../middleware/auth');
+const chatRoutes = require('./chat');
+const dashboardRoutes = require('./dashboard');
 
 const router = express.Router();
 // Health endpoint
@@ -31,5 +34,9 @@ const router = express.Router();
  *                   example: development
  */
 router.get('/', healthController.check.bind(healthController));
+
+// Mount protected API routes
+router.use('/api/chat', authMiddleware, chatRoutes);
+router.use('/api/dashboard', authMiddleware, dashboardRoutes);
 
 module.exports = router;

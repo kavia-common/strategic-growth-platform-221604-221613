@@ -8,9 +8,10 @@ const swaggerSpec = require('../swagger');
 const app = express();
 
 app.use(cors({
-  origin: '*',
+  origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 app.set('trust proxy', true);
 app.use('/docs', swaggerUi.serve, (req, res, next) => {
