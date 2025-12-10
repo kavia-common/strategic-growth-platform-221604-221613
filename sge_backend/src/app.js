@@ -20,39 +20,63 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
-       return callback(null, true);
+    // Check against allowed origins
+    // Using includes() || !origin logic as requested, though !origin is handled above
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     } else {
-       // For this prototype/dev environment, we might want to be permissive if the exact origin isn't matched,
-       // but strictly following the requirement to allow specific origins.
-       // Use the specific allowed list. 
-       return callback(new Error('Not allowed by CORS'));
+      // Be permissive for dev if needed, or strict. 
+      // Returning false instead of error avoids 500s on OPTIONS for unknown origins, just blocks CORS.
+      return callback(null, false);
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey', 'X-Org-Id', 'x-org-id'],
-  credentials: true
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  allowedHeaders: 'Authorization,Content-Type,X-Org-Id,x-client-info,apikey,x-org-id',
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 // 1) Mount cors() with correct options at the very top before any routes/middleware
 app.use(cors(corsOptions));
 
-// 2) Adding a catch-all OPTIONS handler
+// 2) Adding a catch-all OPTIONS handler using the same cors options
 app.options('*', cors(corsOptions));
 
-// Explicit OPTIONS handler for the specific path to ensure 204 success for preflight
-app.options('/api/chat/conversations', cors(corsOptions));
+// 3) Fallback middleware to explicitly set headers and handle OPTIONS if cors() didn't
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Set Access-Control-Allow-Origin if it matches our list
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Org-Id,x-client-info,apikey,x-org-id');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  // Universal OPTIONS responder
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// Explicit test route for OPTIONS to confirm it works
+app.options('/api/healthz', (req, res) => res.sendStatus(204));
+app.get('/api/healthz', (req, res) => res.json({ status: 'ok' }));
 
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`[Request] ${req.method} ${req.url}`);
-  // console.log('Headers:', JSON.stringify(req.headers, null, 2));
   next();
 });
 
+// Swagger UI setup
 app.use('/docs', swaggerUi.serve, (req, res, next) => {
-  const host = req.get('host');           // may or may not include port
-  let protocol = req.protocol;          // http or https
+  const host = req.get('host');
+  let protocol = req.protocol;
 
   const actualPort = req.socket.localPort;
   const hasPort = host.includes(':');
