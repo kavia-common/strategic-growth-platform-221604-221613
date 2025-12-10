@@ -26,7 +26,6 @@ const allowedOrigins = rawOrigins
 // Default for development if no env var is set
 if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
   allowedOrigins.push('http://localhost:3000');
-  allowedOrigins.push('https://vscode-internal-31385-beta.beta01.cloud.kavia.ai:3000');
 }
 
 console.log('[CORS] Configured allowed origins:', allowedOrigins);
