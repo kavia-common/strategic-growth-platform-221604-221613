@@ -24,5 +24,12 @@ All `/api/*` routes require `Authorization: Bearer <token>` header.
 
 ## Setup
 1. Copy `.env.example` to `.env` and fill in credentials.
-2. `npm install`
-3. `npm start`
+2. Configure CORS allowed origins:
+   - Set `API_ALLOWED_ORIGIN` (or `CORS_ORIGIN`) to your frontend URL (e.g., `https://myapp.com,http://localhost:3000`).
+3. `npm install`
+4. `npm start`
+
+## Frontend Connection
+To connect the frontend to this backend:
+- In the **frontend** `.env`, set `REACT_APP_API_URL` to this backend's URL (e.g., `https://api.myapp.com` or `http://localhost:3001`).
+- Restart the frontend dev server if running.

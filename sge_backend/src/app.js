@@ -10,10 +10,18 @@ const app = express();
 // Enable trust proxy to handle X-Forwarded-Proto correctly behind nginx/proxies
 app.enable('trust proxy');
 
-const allowedOrigins = [
-  'https://vscode-internal-17989-beta.beta01.cloud.kavia.ai:3000',
-  'http://localhost:3000'
-];
+// Resolve allowed origins from env vars (comma-separated)
+// Fallback to localhost for dev if nothing set
+const rawOrigins = process.env.API_ALLOWED_ORIGIN || process.env.CORS_ORIGIN || '';
+const allowedOrigins = rawOrigins
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Default for development if no env var is set
+if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:3000');
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -23,7 +31,6 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
-      // Be strict but log it
       console.warn(`[CORS] Blocked request from origin: ${origin}`);
       return callback(null, false);
     }
@@ -35,18 +42,9 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-// 1) Early top-level OPTIONS handler to guarantee 204 for preflights
-// This runs before the cors() middleware to ensure we always reply to OPTIONS
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Org-Id,x-client-info,apikey,x-org-id');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(204);
-});
+// 1) Handle OPTIONS preflight for all routes using the same cors options
+// This ensures 204 response for allowed origins and consistent headers
+app.options('*', cors(corsOptions));
 
 // 2) Mount cors() middleware for actual requests
 app.use(cors(corsOptions));
