@@ -35,8 +35,8 @@ const corsOptions = {
       return callback(null, false);
     }
   },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-  allowedHeaders: 'Authorization,Content-Type,X-Org-Id,x-client-info,apikey,x-org-id',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Org-Id', 'x-client-info', 'apikey', 'x-org-id'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
