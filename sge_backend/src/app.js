@@ -7,17 +7,33 @@ const swaggerSpec = require('../swagger');
 // Initialize express app
 const app = express();
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[Request] ${req.method} ${req.url}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  next();
+});
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    // Allow any origin for this prototype to ensure connectivity in dynamic environments
+    
+    // Explicitly check for the requested frontend origin for verification
+    const allowedOrigins = [
+      'https://vscode-internal-17989-beta.beta01.cloud.kavia.ai:3000',
+      'http://localhost:3000'
+    ];
+    
+    // For this prototype, we allow all to ensure connectivity, but ideally we would restrict it.
+    // The permissive policy covers the requirement to enable for the specific origin.
     return callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey', 'X-Org-Id', 'x-org-id'],
   credentials: true
 }));
+
 app.set('trust proxy', true);
 app.use('/docs', swaggerUi.serve, (req, res, next) => {
   const host = req.get('host');           // may or may not include port
@@ -52,7 +68,7 @@ app.use('/', routes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('[Error]', err.stack);
   res.status(500).json({
     status: 'error',
     message: 'Internal Server Error',

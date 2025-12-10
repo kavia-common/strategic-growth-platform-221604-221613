@@ -3,8 +3,10 @@ const { supabase, getAuthenticatedSupabase } = require('../utils/supabase');
 const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    console.log('[Auth] Checking authorization header...');
+    
     if (!authHeader) {
-      console.warn('No authorization header provided. Using mock user for development.');
+      console.warn('[Auth] No authorization header provided. Using mock user for development.');
       // Relaxed Auth: Inject mock user to allow flow to proceed without header
       req.user = {
         id: 'mock-user-id-123',
@@ -21,7 +23,7 @@ const authMiddleware = async (req, res, next) => {
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.warn('Auth validation failed or token invalid. Using mock user for development/unblock.', error);
+      console.warn('[Auth] Validation failed or token invalid. Using mock user.', error);
       // Relaxed Auth: Inject mock user to allow flow to proceed
       req.user = {
         id: 'mock-user-id-123',
@@ -55,10 +57,11 @@ const authMiddleware = async (req, res, next) => {
       org_id: profile?.org_id,
       role: profile?.role
     };
-
+    
+    console.log('[Auth] User authenticated:', req.user.id);
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err);
+    console.error('[Auth] Middleware error:', err);
     res.status(500).json({ error: 'Internal server error during authentication' });
   }
 };
