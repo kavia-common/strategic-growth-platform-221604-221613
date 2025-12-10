@@ -3,6 +3,7 @@
  * This script verifies that the POST /api/onboarding/complete endpoint works correctly
  */
 
+require('dotenv').config();
 const { supabaseAdmin } = require('./src/utils/supabase');
 
 async function testOnboardingEndpoint() {
@@ -12,6 +13,8 @@ async function testOnboardingEndpoint() {
   console.log('1. Testing Supabase connection...');
   if (!supabaseAdmin) {
     console.error('❌ Supabase admin client is not configured');
+    console.error('   SUPABASE_URL:', process.env.SUPABASE_URL ? 'SET' : 'NOT SET');
+    console.error('   SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET');
     return;
   }
   console.log('✅ Supabase admin client is configured\n');
@@ -26,6 +29,7 @@ async function testOnboardingEndpoint() {
     
     if (error) {
       console.error('❌ Error accessing organizations table:', error.message);
+      console.error('   Details:', error);
       return;
     }
     console.log('✅ Organizations table accessible');
@@ -45,6 +49,7 @@ async function testOnboardingEndpoint() {
     
     if (error) {
       console.error('❌ Error accessing profiles table:', error.message);
+      console.error('   Details:', error);
       return;
     }
     console.log('✅ Profiles table accessible');
@@ -77,6 +82,35 @@ async function testOnboardingEndpoint() {
     }
   } catch (err) {
     console.error('❌ Exception with lookup:', err.message);
+    return;
+  }
+
+  // Test 5: Test organization creation with service role
+  console.log('\n5. Testing organization creation...');
+  try {
+    const testOrgName = `Test Org ${Date.now()}`;
+    const { data: newOrg, error: createError } = await supabaseAdmin
+      .from('organizations')
+      .insert({ name: testOrgName })
+      .select('id, name')
+      .single();
+
+    if (createError) {
+      console.error('❌ Error creating organization:', createError.message);
+      console.error('   Details:', createError);
+      return;
+    }
+    console.log('✅ Organization created successfully');
+    console.log(`   ID: ${newOrg.id}, Name: ${newOrg.name}\n`);
+
+    // Clean up - delete the test org
+    await supabaseAdmin
+      .from('organizations')
+      .delete()
+      .eq('id', newOrg.id);
+    console.log('   Test organization cleaned up');
+  } catch (err) {
+    console.error('❌ Exception creating organization:', err.message);
     return;
   }
 

@@ -100,22 +100,31 @@ class OnboardingController {
     const { organization_name } = req.body;
     const userId = req.user?.id;
 
+    console.log('[OnboardingController] completeOnboarding called');
+    console.log(`[OnboardingController] User ID: ${userId}`);
+    console.log(`[OnboardingController] Organization name: ${organization_name}`);
+    console.log('[OnboardingController] Request body:', req.body);
+    console.log('[OnboardingController] User object:', req.user);
+
     // Validate input
     if (!organization_name || typeof organization_name !== 'string' || organization_name.trim() === '') {
+      console.log('[OnboardingController] Validation failed: invalid organization_name');
       return res.status(400).json({ 
         error: 'organization_name is required and must be a non-empty string' 
       });
     }
 
-    console.log(`Onboarding request for user ${userId}, org: ${organization_name}`);
+    console.log('[OnboardingController] Validation passed, proceeding with onboarding');
 
     try {
       // Check if user is already onboarded (idempotency)
+      console.log(`[OnboardingController] Checking if user ${userId} is already onboarded...`);
       const isOnboarded = await userOnboardingService.isUserOnboarded(userId);
+      console.log(`[OnboardingController] Is user onboarded? ${isOnboarded}`);
 
       if (isOnboarded) {
         // User already has a profile - fetch and return existing data
-        console.log(`User ${userId} is already onboarded, returning existing data`);
+        console.log(`[OnboardingController] User ${userId} is already onboarded, fetching existing data`);
         
         const { data: profile, error: profileError } = await supabaseAdmin
           .from('profiles')
@@ -124,8 +133,11 @@ class OnboardingController {
           .single();
 
         if (profileError) {
+          console.error('[OnboardingController] Error fetching existing profile:', profileError);
           throw new Error(`Failed to fetch existing profile: ${profileError.message}`);
         }
+
+        console.log('[OnboardingController] Existing profile found:', profile);
 
         const { data: org, error: orgError } = await supabaseAdmin
           .from('organizations')
@@ -134,8 +146,12 @@ class OnboardingController {
           .single();
 
         if (orgError) {
+          console.error('[OnboardingController] Error fetching existing organization:', orgError);
           throw new Error(`Failed to fetch existing organization: ${orgError.message}`);
         }
+
+        console.log('[OnboardingController] Existing organization found:', org);
+        console.log('[OnboardingController] Returning existing data to client');
 
         return res.status(200).json({
           success: true,
@@ -146,12 +162,16 @@ class OnboardingController {
       }
 
       // Perform onboarding
+      console.log('[OnboardingController] User not yet onboarded, starting onboarding process...');
       const { organization, profile } = await userOnboardingService.onboardUser(userId, {
         organization_name
       });
 
-      console.log(`Successfully onboarded user ${userId}`);
+      console.log('[OnboardingController] Onboarding completed successfully');
+      console.log('[OnboardingController] Organization:', organization);
+      console.log('[OnboardingController] Profile:', profile);
 
+      console.log('[OnboardingController] Sending success response to client');
       return res.status(200).json({
         success: true,
         message: 'Onboarding completed successfully',
@@ -160,7 +180,8 @@ class OnboardingController {
       });
 
     } catch (error) {
-      console.error('Onboarding error:', error);
+      console.error('[OnboardingController] Onboarding error:', error);
+      console.error('[OnboardingController] Error stack:', error.stack);
       return res.status(500).json({
         error: 'Failed to complete onboarding',
         details: error.message
