@@ -20,11 +20,13 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Check against allowed origins
+    // Using includes() || !origin logic as requested, though !origin is handled above
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
-      // Be strict but log it
-      console.warn(`[CORS] Blocked request from origin: ${origin}`);
+      // Be permissive for dev if needed, or strict. 
+      // Returning false instead of error avoids 500s on OPTIONS for unknown origins, just blocks CORS.
       return callback(null, false);
     }
   },
@@ -35,33 +37,40 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-// 1) Early top-level OPTIONS handler to guarantee 204 for preflights
-// This runs before the cors() middleware to ensure we always reply to OPTIONS
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Org-Id,x-client-info,apikey,x-org-id');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(204);
-});
-
-// 2) Mount cors() middleware for actual requests
+// 1) Mount cors() with correct options at the very top before any routes/middleware
 app.use(cors(corsOptions));
 
-// 3) Request logging middleware
+// 2) Adding a catch-all OPTIONS handler using the same cors options
+app.options('*', cors(corsOptions));
+
+// 3) Fallback middleware to explicitly set headers and handle OPTIONS if cors() didn't
 app.use((req, res, next) => {
-  console.log(`[Request] ${req.method} ${req.url}`);
+  const origin = req.headers.origin;
+  
+  // Set Access-Control-Allow-Origin if it matches our list
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Org-Id,x-client-info,apikey,x-org-id');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  // Universal OPTIONS responder
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
   next();
 });
 
-// Explicit test route for OPTIONS/Health to confirm it works
-// Logging added to confirm updated app is running
-app.get('/api/healthz', (req, res) => {
-  console.log('[Health] /api/healthz endpoint hit - App is updated');
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Explicit test route for OPTIONS to confirm it works
+app.options('/api/healthz', (req, res) => res.sendStatus(204));
+app.get('/api/healthz', (req, res) => res.json({ status: 'ok' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[Request] ${req.method} ${req.url}`);
+  next();
 });
 
 // Swagger UI setup
