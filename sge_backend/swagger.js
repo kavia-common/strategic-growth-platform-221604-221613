@@ -31,6 +31,24 @@ const options = {
       {
         bearerAuth: []
       }
+    ],
+    tags: [
+      {
+        name: 'Chat',
+        description: 'Chat management and messaging'
+      },
+      {
+        name: 'Dashboard',
+        description: 'Dashboard analytics'
+      },
+      {
+        name: 'Onboarding',
+        description: 'User onboarding and organization setup'
+      },
+      {
+        name: 'Webhooks',
+        description: 'Webhook endpoints for external services'
+      }
     ]
   },
   apis: ['./src/routes/*.js', './src/controllers/*.js'] // Path to the API docs

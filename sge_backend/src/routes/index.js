@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const chatRoutes = require('./chat');
 const dashboardRoutes = require('./dashboard');
 const webhookRoutes = require('./webhooks');
+const onboardingRoutes = require('./onboarding');
 
 const router = express.Router();
 // Health endpoint
@@ -42,5 +43,6 @@ router.use('/webhooks', webhookRoutes);
 // Mount protected API routes
 router.use('/api/chat', authMiddleware, chatRoutes);
 router.use('/api/dashboard', authMiddleware, dashboardRoutes);
+router.use('/api/onboarding', authMiddleware, onboardingRoutes);
 
 module.exports = router;
