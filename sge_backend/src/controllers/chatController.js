@@ -116,7 +116,8 @@ const sendMessage = asyncHandler(async (req, res) => {
     replyContent = await geminiService.generateReply(content, contextHistory);
   } catch (err) {
     console.error('Gemini error:', err);
-    replyContent = 'I\'m sorry, I couldn\'t process that request right now.';
+    // Fallback to echo behavior as per requirements if AI service is unavailable
+    replyContent = `I got this input: ${content}`;
   }
 
   // 5. Store assistant message
