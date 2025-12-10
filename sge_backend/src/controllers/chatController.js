@@ -1,143 +1,99 @@
 const asyncHandler = require('express-async-handler');
 const { getAuthenticatedSupabase } = require('../utils/supabase');
-const geminiService = require('../services/geminiService');
+
+// In-memory storage for "minimal no-AI chat flow"
+// Note: These will be reset on server restart
+const conversations = [];
+const messages = [];
+
+// Helper to generate simple IDs
+const generateId = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
 const createConversation = asyncHandler(async (req, res) => {
-  const supabase = getAuthenticatedSupabase(req.token);
+  // We still use req.user from auth middleware
   const { title } = req.body;
   
-  if (!req.user.org_id) {
-    return res.status(400).json({ error: 'User does not belong to an organization' });
-  }
+  const newConv = {
+    id: generateId('conv'),
+    user_id: req.user.id,
+    title: title || 'New Conversation',
+    created_at: new Date().toISOString()
+  };
 
-  const { data, error } = await supabase
-    .from('conversations')
-    .insert({
-      user_id: req.user.id,
-      org_id: req.user.org_id,
-      title: title || 'New Conversation'
-    })
-    .select()
-    .single();
-
-  if (error) throw new Error(error.message);
-  res.status(201).json(data);
+  conversations.push(newConv);
+  res.status(201).json(newConv);
 });
 
 const listConversations = asyncHandler(async (req, res) => {
-  const supabase = getAuthenticatedSupabase(req.token);
+  // Return in-memory conversations for the authenticated user
+  const userConvs = conversations.filter(c => c.user_id === req.user.id);
+  // Sort by created_at desc
+  userConvs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) throw new Error(error.message);
-  res.json(data);
+  res.json(userConvs);
 });
 
 const listMessages = asyncHandler(async (req, res) => {
-  const supabase = getAuthenticatedSupabase(req.token);
   const { id } = req.params;
+  
+  // Return in-memory messages for the conversation
+  const chatMessages = messages.filter(m => m.conversation_id === id);
+  // Sort by created_at asc
+  chatMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('conversation_id', id)
-    .order('created_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
-  res.json(data);
+  res.json(chatMessages);
 });
 
 const sendMessage = asyncHandler(async (req, res) => {
-  const supabase = getAuthenticatedSupabase(req.token);
   const { conversation_id, content } = req.body;
   
-  if (!req.user.org_id) {
-    return res.status(400).json({ error: 'User does not belong to an organization' });
-  }
-
   let chatId = conversation_id;
+  let conversationTitle = null;
 
   // 1. If no conversation_id, create new conversation
   if (!chatId) {
+    chatId = generateId('conv');
     const title = content.substring(0, 30) + (content.length > 30 ? '...' : '');
-    const { data: conv, error: convError } = await supabase
-      .from('conversations')
-      .insert({
-        user_id: req.user.id,
-        org_id: req.user.org_id,
-        title
-      })
-      .select()
-      .single();
+    conversationTitle = title;
     
-    if (convError) throw new Error(convError.message);
-    chatId = conv.id;
+    const newConv = {
+      id: chatId,
+      user_id: req.user.id,
+      title,
+      created_at: new Date().toISOString()
+    };
+    conversations.push(newConv);
   }
 
   // 2. Store user message
-  const { data: userMsg, error: msgError } = await supabase
-    .from('messages')
-    .insert({
-      conversation_id: chatId,
-      org_id: req.user.org_id,
-      user_id: req.user.id,
-      role: 'user',
-      content
-    })
-    .select()
-    .single();
+  const userMsg = {
+    id: generateId('msg-user'),
+    conversation_id: chatId,
+    user_id: req.user.id,
+    role: 'user',
+    content,
+    created_at: new Date().toISOString()
+  };
+  messages.push(userMsg);
 
-  if (msgError) throw new Error(msgError.message);
+  // 3. Generate reply (Echo)
+  const assistantContent = `I got this input: ${content}`;
 
-  // 3. Fetch history for context (exclude current message)
-  // We fetch last 21 messages to get 20 previous ones + the current one
-  const { data: history } = await supabase
-    .from('messages')
-    .select('role, content')
-    .eq('conversation_id', chatId)
-    .order('created_at', { ascending: true });
-    
-  // Filter out the message we just added based on content or assume it's the last one
-  // Simple approach: exclude the very last one if it matches our insertion
-  const previousHistory = history.filter(msg => 
-      // This is a naive check; ideally use ID but we didn't select ID in history query
-      // Re-fetching or just taking all except last
-      msg.content !== userMsg.content || msg.role !== userMsg.role
-  ); 
-  // Better: just slice. If we just inserted, it's at the end.
-  const contextHistory = history.slice(0, -1);
+  // 4. Store assistant message
+  const assistantMsg = {
+    id: generateId('msg-asst'),
+    conversation_id: chatId,
+    role: 'assistant',
+    content: assistantContent,
+    created_at: new Date(Date.now() + 50).toISOString() // slightly later
+  };
+  messages.push(assistantMsg);
 
-  // 4. Generate reply
-  let replyContent = '';
-  try {
-    replyContent = await geminiService.generateReply(content, contextHistory);
-  } catch (err) {
-    console.error('Gemini error:', err);
-    // Fallback to echo behavior as per requirements if AI service is unavailable
-    replyContent = `I got this input: ${content}`;
-  }
-
-  // 5. Store assistant message
-  const { data: assistantMsg, error: replyError } = await supabase
-    .from('messages')
-    .insert({
-      conversation_id: chatId,
-      org_id: req.user.org_id,
-      role: 'assistant',
-      content: replyContent
-    })
-    .select()
-    .single();
-
-  if (replyError) throw new Error(replyError.message);
-
+  // Return specific shape required by task
   res.json({
     conversation_id: chatId,
-    userMessage: userMsg,
-    assistantMessage: assistantMsg
+    user_message: userMsg,
+    assistant_message: assistantMsg
   });
 });
 
